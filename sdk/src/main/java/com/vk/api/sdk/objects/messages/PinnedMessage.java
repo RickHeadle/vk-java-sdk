@@ -17,6 +17,9 @@ public class PinnedMessage implements Validable {
     @SerializedName("attachments")
     private List<MessageAttachment> attachments;
 
+    @SerializedName("attachments")
+    private List<List<String>> rawAttachments;
+
     /**
      * Unique auto-incremented number for all messages with this peer
      */
@@ -89,7 +92,149 @@ public class PinnedMessage implements Validable {
     private String text;
 
     public List<MessageAttachment> getAttachments() {
-        return attachments;
+        if (attachments != null) {
+            return attachments;
+        }
+        // Convert raw array format to MessageAttachment objects
+        if (rawAttachments != null) {
+            return convertRawAttachments(rawAttachments);
+        }
+        return null;
+    }
+
+    private List<MessageAttachment> convertRawAttachments(List<List<String>> rawAttachments) {
+        List<MessageAttachment> result = new ArrayList<>();
+        
+        for (List<String> rawAttachment : rawAttachments) {
+            if (rawAttachment.size() >= 2) {
+                MessageAttachment attachment = createMessageAttachmentFromArray(rawAttachment);
+                if (attachment != null) {
+                    result.add(attachment);
+                }
+            }
+        }
+        return result;
+    }
+
+    private MessageAttachment createMessageAttachmentFromArray(List<String> rawAttachment) {
+        String type = rawAttachment.get(0);
+        String data = rawAttachment.get(1);
+        
+        MessageAttachment attachment = new MessageAttachment();
+        attachment.setType(type); // Set the attachment type
+        
+        // Handle different attachment types
+        switch (type) {
+            case "photo":
+                return createPhotoAttachment(data);
+            case "audio":
+                return createAudioAttachment(data);
+            case "video":
+                return createVideoAttachment(data);
+            case "doc":
+                return createDocumentAttachment(data);
+            case "link":
+                return createLinkAttachment(data, rawAttachment);
+            // Add other types as needed
+            default:
+                log.warn("Unhandled attachment type: {}", type);
+                return createGenericAttachment(type, data);
+        }
+    }
+
+    private MessageAttachment createPhotoAttachment(String photoData) {
+        MessageAttachment attachment = new MessageAttachment();
+        attachment.setType("photo");
+        
+        // Parse photo ID format: "owner_id_photo_id"
+        String[] parts = photoData.split("_");
+        if (parts.length >= 2) {
+            try {
+                // Create a Photo object that the SDK expects
+                Photo photo = new Photo();
+                photo.setOwnerId(Long.parseLong(parts[0]));
+                photo.setId(Integer.parseInt(parts[1]));
+                
+                // Set the photo object in the attachment
+                // This depends on the SDK's MessageAttachment structure
+                attachment.setPhoto(photo);
+                
+            } catch (NumberFormatException e) {
+                log.error("Failed to parse photo data: {}", photoData, e);
+            }
+        }
+        return attachment;
+    }
+
+    private MessageAttachment createAudioAttachment(String audioData) {
+        MessageAttachment attachment = new MessageAttachment();
+        attachment.setType("audio");
+        
+        try {
+            // Audio format: "owner_id_audio_id"
+            String[] parts = audioData.split("_");
+            if (parts.length >= 2) {
+                Audio audio = new Audio();
+                audio.setOwnerId(Long.parseLong(parts[0]));
+                audio.setId(Integer.parseInt(parts[1]));
+                attachment.setAudio(audio);
+            }
+        } catch (NumberFormatException e) {
+            log.error("Failed to parse audio data: {}", audioData, e);
+        }
+        return attachment;
+    }
+
+    private MessageAttachment createVideoAttachment(String videoData) {
+    MessageAttachment attachment = new MessageAttachment();
+    attachment.setType("video");
+    
+    try {
+            // Video format: "owner_id_video_id" or "owner_id_video_id_access_key"
+            String[] parts = videoData.split("_");
+            if (parts.length >= 2) {
+                Video video = new Video();
+                video.setOwnerId(Long.parseLong(parts[0]));
+                video.setId(Integer.parseInt(parts[1]));
+                
+                if (parts.length >= 3) {
+                    video.setAccessKey(parts[2]);
+                }
+                attachment.setVideo(video);
+            }
+        } catch (NumberFormatException e) {
+            log.error("Failed to parse video data: {}", videoData, e);
+        }
+        return attachment;
+    }
+
+    private MessageAttachment createLinkAttachment(String linkData, List<String> rawAttachment) {
+        MessageAttachment attachment = new MessageAttachment();
+        attachment.setType("link");
+        
+        // Link might have additional data in the array
+        Link link = new Link();
+        link.setUrl(linkData); // First element might be URL
+        
+        if (rawAttachment.size() > 2) {
+            // Additional link metadata might be in subsequent array elements
+            link.setTitle(rawAttachment.size() > 2 ? rawAttachment.get(2) : null);
+            link.setDescription(rawAttachment.size() > 3 ? rawAttachment.get(3) : null);
+        }
+        
+        attachment.setLink(link);
+        return attachment;
+    }
+
+    // Fallback for unhandled types
+    private MessageAttachment createGenericAttachment(String type, String data) {
+        MessageAttachment attachment = new MessageAttachment();
+        attachment.setType(type);
+        
+        // Store raw data in a way that doesn't break the SDK
+        // This might involve using a custom field or additional properties
+        log.debug("Created generic attachment for type: {} with data: {}", type, data);
+        return attachment;
     }
 
     public PinnedMessage setAttachments(List<MessageAttachment> attachments) {
