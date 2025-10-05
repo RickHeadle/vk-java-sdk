@@ -19,6 +19,7 @@ public class GsonHolder {
     put(com.vk.api.sdk.objects.newsfeed.CommentsItem.class, new com.vk.api.sdk.objects.newsfeed.CommentsItem.Deserializer());
     put(com.vk.api.sdk.objects.leadforms.AnswerOneOf.class, new com.vk.api.sdk.objects.leadforms.AnswerOneOf.Deserializer());
     put(com.vk.api.sdk.events.CallbackEvent.class, new com.vk.api.sdk.events.CallbackEvent.Deserializer());
+    put(com.vk.api.sdk.objects.messages.ChatSettings.class, new com.vk.api.sdk.objects.messages.ChatSettingsDeserializer());
     }};
 
     private GsonBuilder gsonBuilder;
